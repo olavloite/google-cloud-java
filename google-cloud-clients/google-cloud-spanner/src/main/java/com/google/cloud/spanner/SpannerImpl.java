@@ -266,6 +266,7 @@ class SpannerImpl extends BaseService<SpannerOptions> implements Spanner {
     }
   }
 
+  @VisibleForTesting
   DatabaseClientImpl createDatabaseClient(SessionPool pool) {
     return new DatabaseClientImpl(pool);
   }
