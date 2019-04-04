@@ -186,11 +186,11 @@ public class DatabaseClientStressTest {
   public static void startStaticServer() {
     mockSpanner = new MockSpannerServiceImpl();
     mockSpanner.setAbortProbability(0.0D); // We don't want any unpredictable aborted transactions.
-    mockSpanner.putStatementResult(StatementResult.of(SELECT1, SELECT1_RESULTSET));
-    mockSpanner.putStatementResult(StatementResult.of(SELECT_RANDOM, RANDOM_RESULT_SET));
+    mockSpanner.putStatementResult(StatementResult.query(SELECT1, SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(StatementResult.query(SELECT_RANDOM, RANDOM_RESULT_SET));
     mockSpanner.putStatementResult(
-        StatementResult.of(SELECT_RANDOM_WITH_PARAMS, RANDOM_WITH_PARAMS_RESULT_SET));
-    mockSpanner.putStatementResult(StatementResult.of(UPDATE_STATEMENT, UPDATE_COUNT));
+        StatementResult.query(SELECT_RANDOM_WITH_PARAMS, RANDOM_WITH_PARAMS_RESULT_SET));
+    mockSpanner.putStatementResult(StatementResult.update(UPDATE_STATEMENT, UPDATE_COUNT));
     serviceHelper =
         new MockServiceHelper("in-process-1", Arrays.<MockGrpcService>asList(mockSpanner));
     serviceHelper.start();
