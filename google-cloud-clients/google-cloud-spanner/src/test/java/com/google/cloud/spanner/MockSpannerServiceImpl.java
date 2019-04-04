@@ -208,46 +208,75 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
 
   /** The result of a statement that is executed on a {@link MockSpannerServiceImpl}. */
   public static class StatementResult {
+    private enum StatementResultType {
+      RESULT_SET, UPDATE_COUNT, EXCEPTION;
+    }
+
+    private final StatementResultType type;
     private final Statement statement;
     private final Long updateCount;
     private final ResultSet resultSet;
+    private final StatusRuntimeException exception;
 
-    /** Create a {@link StatementResult} for a query that returns a {@link ResultSet}. */
-    public static StatementResult of(Statement statement, ResultSet resultSet) {
+    /** Creates a {@link StatementResult} for a query that returns a {@link ResultSet}. */
+    public static StatementResult query(Statement statement, ResultSet resultSet) {
       return new StatementResult(statement, resultSet);
     }
 
-    /** Create a {@link StatementResult} for a DML statement that returns an update count. */
-    public static StatementResult of(Statement statement, long updateCount) {
+    /** Creates a {@link StatementResult} for a DML statement that returns an update count. */
+    public static StatementResult update(Statement statement, long updateCount) {
       return new StatementResult(statement, updateCount);
     }
 
+    /** Creates a {@link StatementResult} for statement that should return an error. */
+    public static StatementResult exception(Statement statement, StatusRuntimeException exception) {
+      return new StatementResult(statement, exception);
+    }
+
     private StatementResult(Statement statement, Long updateCount) {
-      this.statement = statement;
-      this.updateCount = updateCount;
+      this.statement = Preconditions.checkNotNull(statement);
+      this.updateCount = Preconditions.checkNotNull(updateCount);
       this.resultSet = null;
+      this.exception = null;
+      this.type = StatementResultType.UPDATE_COUNT;
     }
 
     private StatementResult(Statement statement, ResultSet resultSet) {
-      this.statement = statement;
+      this.statement = Preconditions.checkNotNull(statement);
+      this.resultSet = Preconditions.checkNotNull(resultSet);
       this.updateCount = null;
-      this.resultSet = resultSet;
+      this.exception = null;
+      this.type = StatementResultType.RESULT_SET;
     }
 
-    boolean isResultSet() {
-      return resultSet != null;
+    private StatementResult(Statement statement, StatusRuntimeException exception) {
+      this.statement = Preconditions.checkNotNull(statement);
+      this.exception = Preconditions.checkNotNull(exception);
+      this.resultSet = null;
+      this.updateCount = null;
+      this.type = StatementResultType.EXCEPTION;
     }
 
-    ResultSet getResultSet() {
+    private StatementResultType getType() {
+      return type;
+    }
+
+    private ResultSet getResultSet() {
       Preconditions.checkState(
-          isResultSet(), "This statement result does not contain a result set");
+          type == StatementResultType.RESULT_SET, "This statement result does not contain a result set");
       return resultSet;
     }
 
-    Long getUpdateCount() {
+    private Long getUpdateCount() {
       Preconditions.checkState(
-          !isResultSet(), "This statement result does not contain an update count");
+          type == StatementResultType.UPDATE_COUNT, "This statement result does not contain an update count");
       return updateCount;
+    }
+
+    private StatusRuntimeException getException() {
+      Preconditions.checkState(
+          type == StatementResultType.EXCEPTION, "This statement result does not contain an exception");
+      return exception;
     }
   }
 
@@ -311,6 +340,20 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
   public void putStatementResult(StatementResult result) {
     Preconditions.checkNotNull(result);
     statementResults.put(result.statement, result);
+  }
+
+  private StatementResult getResult(Statement statement) {
+    StatementResult res = statementResults.get(statement);
+    if(res == null) {
+    throw Status.INTERNAL
+    .withDescription(
+        String.format(
+            "There is no result registered for the statement: %s\n"
+                + "Call TestSpannerImpl#addStatementResult(StatementResult) before executing the statement.",
+            statement.toString()))
+    .asRuntimeException();
+    }
+    return res;
   }
 
   /** Sets the probability that this mock server aborts a read/write transaction at random. */
@@ -447,25 +490,32 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
       simulateAbort(session, transactionId);
       Statement statement =
           buildStatement(request.getSql(), request.getParamTypesMap(), request.getParams());
-      StatementResult result = statementResults.get(statement);
-      if (result.isResultSet()) {
-        returnResultSet(result.getResultSet(), request.getTransaction(), responseObserver);
-      } else {
-        if (isPartitionedDmlTransaction(transactionId)) {
-          responseObserver.onNext(
-              ResultSet.newBuilder()
-                  .setStats(
-                      ResultSetStats.newBuilder()
-                          .setRowCountLowerBound(result.getUpdateCount())
-                          .build())
-                  .build());
-        } else {
-          responseObserver.onNext(
-              ResultSet.newBuilder()
-                  .setStats(
-                      ResultSetStats.newBuilder().setRowCountExact(result.getUpdateCount()).build())
-                  .build());
-        }
+      StatementResult result = getResult(statement);
+      switch(result.getType()) {
+        case EXCEPTION:
+          throw result.getException();
+        case RESULT_SET:
+          returnResultSet(result.getResultSet(), request.getTransaction(), responseObserver);
+          break;
+        case UPDATE_COUNT:
+          if (isPartitionedDmlTransaction(transactionId)) {
+            responseObserver.onNext(
+                ResultSet.newBuilder()
+                    .setStats(
+                        ResultSetStats.newBuilder()
+                            .setRowCountLowerBound(result.getUpdateCount())
+                            .build())
+                    .build());
+          } else {
+            responseObserver.onNext(
+                ResultSet.newBuilder()
+                    .setStats(
+                        ResultSetStats.newBuilder().setRowCountExact(result.getUpdateCount()).build())
+                    .build());
+          }
+          break;
+        default:
+          throw new IllegalStateException("Unknown result type: " + result.getType());
       }
       responseObserver.onCompleted();
     } catch (StatusRuntimeException e) {
@@ -513,16 +563,18 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
           Statement spannerStatement =
               buildStatement(
                   statement.getSql(), statement.getParamTypesMap(), statement.getParams());
-          StatementResult res = statementResults.get(spannerStatement);
-          if (res.isResultSet()) {
-            status =
-                com.google.rpc.Status.newBuilder()
-                    .setCode(Code.INVALID_ARGUMENT_VALUE)
-                    .setMessage("Not a DML statement: " + statement.getSql())
-                    .build();
-            break;
+          StatementResult res = getResult(spannerStatement);
+          switch(res.getType()) {
+            case EXCEPTION:
+              throw res.getException();
+            case RESULT_SET:
+              throw Status.INVALID_ARGUMENT.withDescription("Not a DML statement: " + statement.getSql()).asRuntimeException();
+            case UPDATE_COUNT:
+              results.add(res);
+              break;
+            default:
+              throw new IllegalStateException("Unknown result type: " + res.getType());
           }
-          results.add(res);
         } catch (StatusRuntimeException e) {
           status =
               com.google.rpc.Status.newBuilder()
@@ -581,24 +633,23 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
       simulateAbort(session, transactionId);
       Statement statement =
           buildStatement(request.getSql(), request.getParamTypesMap(), request.getParams());
-      StatementResult res = statementResults.get(statement);
-      if (res == null) {
-        throw Status.INTERNAL
-            .withDescription(
-                String.format(
-                    "There is no result registered for the statement: %s\n"
-                        + "Call TestSpannerImpl#addStatementResult(StatementResult) before executing the statement.",
-                    statement.toString()))
-            .asRuntimeException();
-      } else if (res.isResultSet()) {
-        returnPartialResultSet(res.getResultSet(), request.getTransaction(), responseObserver);
-      } else {
-        returnPartialResultSet(
-            session,
-            res.getUpdateCount(),
-            !isPartitionedDmlTransaction(transactionId),
-            responseObserver,
-            request.getTransaction());
+      StatementResult res = getResult(statement);
+      switch(res.getType()) {
+        case EXCEPTION:
+          throw res.getException();
+        case RESULT_SET:
+          returnPartialResultSet(res.getResultSet(), request.getTransaction(), responseObserver);
+          break;
+        case UPDATE_COUNT:
+          returnPartialResultSet(
+              session,
+              res.getUpdateCount(),
+              !isPartitionedDmlTransaction(transactionId),
+              responseObserver,
+              request.getTransaction());
+          break;
+        default:
+          throw new IllegalStateException("Unknown result type: " + res.getType());
       }
     } catch (StatusRuntimeException e) {
       responseObserver.onError(e);
