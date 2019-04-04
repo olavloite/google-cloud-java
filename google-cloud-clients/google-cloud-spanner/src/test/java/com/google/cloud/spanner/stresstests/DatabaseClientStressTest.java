@@ -25,18 +25,23 @@ import com.google.api.gax.core.NoCredentialsProvider;
 import com.google.api.gax.grpc.testing.LocalChannelProvider;
 import com.google.api.gax.grpc.testing.MockGrpcService;
 import com.google.api.gax.grpc.testing.MockServiceHelper;
+import com.google.cloud.ByteArray;
+import com.google.cloud.Date;
 import com.google.cloud.NoCredentials;
+import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.AbortedException;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
+import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.ReadContext;
 import com.google.cloud.spanner.ReadOnlyTransaction;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.StressTest;
 import com.google.cloud.spanner.TransactionContext;
 import com.google.cloud.spanner.TransactionManager;
 import com.google.cloud.spanner.TransactionRunner;
@@ -67,6 +72,7 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
@@ -74,6 +80,7 @@ import org.junit.runners.JUnit4;
  * Stress test for {@link DatabaseClient}. This test uses the {@link MockSpannerServiceImpl} as a
  * server. This is a mock implementation of a Cloud Spanner server that is started in-process.
  */
+@Category(StressTest.class)
 @RunWith(JUnit4.class)
 public class DatabaseClientStressTest {
   private static final String PROJECT_ID = "test-project";
@@ -124,6 +131,50 @@ public class DatabaseClientStressTest {
   private static final Statement UPDATE_STATEMENT =
       Statement.of("UPDATE FOO SET BAR=1 WHERE BAZ=2");
   private static final long UPDATE_COUNT = 1L;
+  private static final Mutation MUTATION =
+      Mutation.newInsertBuilder("FOO")
+          .set("COL1")
+          .to(Boolean.TRUE)
+          .set("COL2")
+          .to(ByteArray.copyFrom(new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}))
+          .set("COL3")
+          .to(Date.fromJavaUtilDate(new java.util.Date()))
+          .set("COL4")
+          .to(Math.PI)
+          .set("COL5")
+          .to(1L)
+          .set("COL6")
+          .to("TEST")
+          .set("COL7")
+          .to(Timestamp.of(new java.sql.Timestamp(System.currentTimeMillis())))
+          .set("COL8")
+          .toBoolArray(Arrays.asList(true, false, true))
+          .set("COL9")
+          .toBytesArray(
+              Arrays.asList(
+                  ByteArray.copyFrom(new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}),
+                  ByteArray.copyFrom(new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}),
+                  ByteArray.copyFrom(new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10})))
+          .set("COL10")
+          .toDateArray(
+              Arrays.asList(
+                  Date.fromJavaUtilDate(new java.util.Date()),
+                  Date.fromJavaUtilDate(new java.util.Date()),
+                  Date.fromJavaUtilDate(new java.util.Date())))
+          .set("COL11")
+          .toFloat64Array(Arrays.asList(Math.PI, Math.PI, Math.PI))
+          .set("COL12")
+          .toInt64Array(Arrays.asList(1L, 2L, 3L))
+          .set("COL13")
+          .toStringArray(Arrays.asList("TEST", "TEST", "TEST"))
+          .set("COL14")
+          .toTimestampArray(
+              Arrays.asList(
+                  Timestamp.of(new java.sql.Timestamp(System.currentTimeMillis())),
+                  Timestamp.of(new java.sql.Timestamp(System.currentTimeMillis())),
+                  Timestamp.of(new java.sql.Timestamp(System.currentTimeMillis()))))
+          .build();
+  private static final List<Mutation> MUTATIONS = Arrays.asList(MUTATION, MUTATION, MUTATION);
 
   private static MockSpannerServiceImpl mockSpanner;
   private static MockServiceHelper serviceHelper;
@@ -652,6 +703,50 @@ public class DatabaseClientStressTest {
           }
         };
     runStressTest(callable, NUMBER_OF_UPDATE_TEST_EXECUTIONS / NUMBER_OF_UPDATES_IN_TX);
+  }
+
+  @Test
+  public void partitionedUpdateTest()
+      throws InterruptedException, ExecutionException, TimeoutException {
+    final DatabaseClient dbClient =
+        spanner.getDatabaseClient(DatabaseId.of(PROJECT_ID, INSTANCE_ID, DATABASE_ID));
+    Callable<Long> callable =
+        new Callable<Long>() {
+          @Override
+          public Long call() throws Exception {
+            return dbClient.executePartitionedUpdate(UPDATE_STATEMENT);
+          }
+        };
+    runStressTest(callable, NUMBER_OF_UPDATE_TEST_EXECUTIONS);
+  }
+
+  @Test
+  public void writeTest() throws InterruptedException, ExecutionException, TimeoutException {
+    final DatabaseClient dbClient =
+        spanner.getDatabaseClient(DatabaseId.of(PROJECT_ID, INSTANCE_ID, DATABASE_ID));
+    Callable<Timestamp> callable =
+        new Callable<Timestamp>() {
+          @Override
+          public Timestamp call() throws Exception {
+            return dbClient.write(MUTATIONS);
+          }
+        };
+    runStressTest(callable, NUMBER_OF_UPDATE_TEST_EXECUTIONS);
+  }
+
+  @Test
+  public void writeAtLeastOnceTest()
+      throws InterruptedException, ExecutionException, TimeoutException {
+    final DatabaseClient dbClient =
+        spanner.getDatabaseClient(DatabaseId.of(PROJECT_ID, INSTANCE_ID, DATABASE_ID));
+    Callable<Timestamp> callable =
+        new Callable<Timestamp>() {
+          @Override
+          public Timestamp call() throws Exception {
+            return dbClient.writeAtLeastOnce(MUTATIONS);
+          }
+        };
+    runStressTest(callable, NUMBER_OF_UPDATE_TEST_EXECUTIONS);
   }
 
   private void verifySelect1ResultSet(ReadContext context) {
