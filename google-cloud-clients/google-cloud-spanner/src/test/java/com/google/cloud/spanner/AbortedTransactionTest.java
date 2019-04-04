@@ -61,9 +61,9 @@ public class AbortedTransactionTest {
   public static void startStaticServer() throws IOException {
     mockSpanner = new MockSpannerServiceImpl();
     mockSpanner.setAbortProbability(0.0D); // We don't want any randomly aborted transactions.
-    mockSpanner.putStatementResult(StatementResult.of(Statement.of(INSERT_DML), 4L));
-    mockSpanner.putStatementResult(StatementResult.of(Statement.of(UPDATE_DML), 4L));
-    mockSpanner.putStatementResult(StatementResult.of(Statement.of(DELETE_DML), 4L));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(INSERT_DML), 4L));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(UPDATE_DML), 4L));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(DELETE_DML), 4L));
     serviceHelper =
         new MockServiceHelper("in-process-1", Arrays.<MockGrpcService>asList(mockSpanner));
     serviceHelper.start();
