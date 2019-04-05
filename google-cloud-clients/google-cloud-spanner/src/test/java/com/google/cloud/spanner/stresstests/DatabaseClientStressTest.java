@@ -49,6 +49,7 @@ import com.google.cloud.spanner.TransactionRunner.TransactionCallable;
 import com.google.cloud.spanner.v1.SpannerClient;
 import com.google.cloud.spanner.v1.SpannerSettings;
 import com.google.common.base.Function;
+import com.google.common.base.Stopwatch;
 import com.google.protobuf.Empty;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
@@ -227,6 +228,8 @@ public class DatabaseClientStressTest {
   @Test
   public void singleUseSelect1Test()
       throws InterruptedException, ExecutionException, TimeoutException {
+    System.out.println("SINGLE_USE");
+    Stopwatch watch = Stopwatch.createStarted();
     singleUseTest(
         new Function<ReadContext, Void>() {
           @Override
@@ -236,11 +239,24 @@ public class DatabaseClientStressTest {
           }
         },
         NUMBER_OF_SELECT1_TEST_EXECUTIONS);
+    watch.stop();
+    System.out.println(
+        String.format(
+            "Executed %d SELECT 1 statements in %dms",
+            NUMBER_OF_SELECT1_TEST_EXECUTIONS, watch.elapsed(TimeUnit.MILLISECONDS)));
+    System.out.println(
+        String.format(
+            "Executed %.2f SELECT 1 statements per second",
+            (double) NUMBER_OF_SELECT1_TEST_EXECUTIONS
+                / (double) watch.elapsed(TimeUnit.MILLISECONDS)
+                * 1000D));
   }
 
   @Test
   public void singleUseRandomTest()
       throws InterruptedException, ExecutionException, TimeoutException {
+    System.out.println("SINGLE_USE");
+    Stopwatch watch = Stopwatch.createStarted();
     singleUseTest(
         new Function<ReadContext, Void>() {
           @Override
@@ -250,11 +266,27 @@ public class DatabaseClientStressTest {
           }
         },
         NUMBER_OF_RANDOM_TEST_EXECUTIONS);
+    watch.stop();
+    System.out.println(
+        String.format(
+            "Executed %d SELECT RANDOM statements with %d rows in %dms",
+            NUMBER_OF_RANDOM_TEST_EXECUTIONS,
+            ROW_COUNT_RANDOM_RESULT_SET,
+            watch.elapsed(TimeUnit.MILLISECONDS)));
+    System.out.println(
+        String.format(
+            "Executed %.2f SELECT RANDOM statements with %d rows per second",
+            (double) NUMBER_OF_RANDOM_TEST_EXECUTIONS
+                / (double) watch.elapsed(TimeUnit.MILLISECONDS)
+                * 1000D,
+            ROW_COUNT_RANDOM_RESULT_SET));
   }
 
   @Test
   public void singleUseRandomWithParamsTest()
       throws InterruptedException, ExecutionException, TimeoutException {
+    System.out.println("SINGLE_USE");
+    Stopwatch watch = Stopwatch.createStarted();
     singleUseTest(
         new Function<ReadContext, Void>() {
           @Override
@@ -264,6 +296,20 @@ public class DatabaseClientStressTest {
           }
         },
         NUMBER_OF_RANDOM_TEST_EXECUTIONS);
+    watch.stop();
+    System.out.println(
+        String.format(
+            "Executed %d SELECT RANDOM statements with parameters with %d rows in %dms",
+            NUMBER_OF_RANDOM_TEST_EXECUTIONS,
+            ROW_COUNT_RANDOM_RESULT_SET,
+            watch.elapsed(TimeUnit.MILLISECONDS)));
+    System.out.println(
+        String.format(
+            "Executed %.2f SELECT RANDOM statements with parameters with %d rows per second",
+            (double) NUMBER_OF_RANDOM_TEST_EXECUTIONS
+                / (double) watch.elapsed(TimeUnit.MILLISECONDS)
+                * 1000D,
+            ROW_COUNT_RANDOM_RESULT_SET));
   }
 
   private <T> void singleUseTest(final Function<ReadContext, T> verifyFunction, int testRuns)
@@ -286,6 +332,8 @@ public class DatabaseClientStressTest {
   @Test
   public void singleUseReadOnlyTransactionSelect1Test()
       throws InterruptedException, ExecutionException, TimeoutException {
+    System.out.println("SINGLE_USE_TX");
+    Stopwatch watch = Stopwatch.createStarted();
     singleUseReadOnlyTransactionTest(
         new Function<ReadContext, Void>() {
           @Override
@@ -295,11 +343,24 @@ public class DatabaseClientStressTest {
           }
         },
         NUMBER_OF_SELECT1_TEST_EXECUTIONS);
+    watch.stop();
+    System.out.println(
+        String.format(
+            "Executed %d SELECT 1 statements in %dms",
+            NUMBER_OF_SELECT1_TEST_EXECUTIONS, watch.elapsed(TimeUnit.MILLISECONDS)));
+    System.out.println(
+        String.format(
+            "Executed %.2f SELECT 1 statements per second",
+            (double) NUMBER_OF_SELECT1_TEST_EXECUTIONS
+                / (double) watch.elapsed(TimeUnit.MILLISECONDS)
+                * 1000D));
   }
 
   @Test
   public void singleUseReadOnlyTransactionRandomTest()
       throws InterruptedException, ExecutionException, TimeoutException {
+    System.out.println("SINGLE_USE_TX");
+    Stopwatch watch = Stopwatch.createStarted();
     singleUseReadOnlyTransactionTest(
         new Function<ReadContext, Void>() {
           @Override
@@ -309,11 +370,27 @@ public class DatabaseClientStressTest {
           }
         },
         NUMBER_OF_RANDOM_TEST_EXECUTIONS);
+    watch.stop();
+    System.out.println(
+        String.format(
+            "Executed %d SELECT RANDOM statements with %d rows in %dms",
+            NUMBER_OF_RANDOM_TEST_EXECUTIONS,
+            ROW_COUNT_RANDOM_RESULT_SET,
+            watch.elapsed(TimeUnit.MILLISECONDS)));
+    System.out.println(
+        String.format(
+            "Executed %.2f SELECT RANDOM statements with %d rows per second",
+            (double) NUMBER_OF_RANDOM_TEST_EXECUTIONS
+                / (double) watch.elapsed(TimeUnit.MILLISECONDS)
+                * 1000D,
+            ROW_COUNT_RANDOM_RESULT_SET));
   }
 
   @Test
   public void singleUseReadOnlyTransactionRandomWithParamsTest()
       throws InterruptedException, ExecutionException, TimeoutException {
+    System.out.println("SINGLE_USE_TX");
+    Stopwatch watch = Stopwatch.createStarted();
     singleUseReadOnlyTransactionTest(
         new Function<ReadContext, Void>() {
           @Override
@@ -323,6 +400,20 @@ public class DatabaseClientStressTest {
           }
         },
         NUMBER_OF_RANDOM_TEST_EXECUTIONS);
+    watch.stop();
+    System.out.println(
+        String.format(
+            "Executed %d SELECT RANDOM statements with parameters with %d rows in %dms",
+            NUMBER_OF_RANDOM_TEST_EXECUTIONS,
+            ROW_COUNT_RANDOM_RESULT_SET,
+            watch.elapsed(TimeUnit.MILLISECONDS)));
+    System.out.println(
+        String.format(
+            "Executed %.2f SELECT RANDOM statements with parameters with %d rows per second",
+            (double) NUMBER_OF_RANDOM_TEST_EXECUTIONS
+                / (double) watch.elapsed(TimeUnit.MILLISECONDS)
+                * 1000D,
+            ROW_COUNT_RANDOM_RESULT_SET));
   }
 
   private <T> void singleUseReadOnlyTransactionTest(
@@ -347,6 +438,8 @@ public class DatabaseClientStressTest {
   @Test
   public void readOnlyTransactionSelect1Test()
       throws InterruptedException, ExecutionException, TimeoutException {
+    System.out.println("READ_ONLY_TX");
+    Stopwatch watch = Stopwatch.createStarted();
     readOnlyTransactionTest(
         new Function<ReadContext, Void>() {
           @Override
@@ -356,11 +449,24 @@ public class DatabaseClientStressTest {
           }
         },
         NUMBER_OF_SELECT1_TEST_EXECUTIONS / NUMBER_OF_QUERIES_IN_TX);
+    watch.stop();
+    System.out.println(
+        String.format(
+            "Executed %d SELECT 1 statements in %dms",
+            NUMBER_OF_SELECT1_TEST_EXECUTIONS, watch.elapsed(TimeUnit.MILLISECONDS)));
+    System.out.println(
+        String.format(
+            "Executed %.2f SELECT 1 statements per second",
+            (double) NUMBER_OF_SELECT1_TEST_EXECUTIONS
+                / (double) watch.elapsed(TimeUnit.MILLISECONDS)
+                * 1000D));
   }
 
   @Test
   public void readOnlyTransactionRandomTest()
       throws InterruptedException, ExecutionException, TimeoutException {
+    System.out.println("READ_ONLY_TX");
+    Stopwatch watch = Stopwatch.createStarted();
     readOnlyTransactionTest(
         new Function<ReadContext, Void>() {
           @Override
@@ -370,11 +476,27 @@ public class DatabaseClientStressTest {
           }
         },
         NUMBER_OF_RANDOM_TEST_EXECUTIONS / NUMBER_OF_QUERIES_IN_TX);
+    watch.stop();
+    System.out.println(
+        String.format(
+            "Executed %d SELECT RANDOM statements with %d rows in %dms",
+            NUMBER_OF_RANDOM_TEST_EXECUTIONS,
+            ROW_COUNT_RANDOM_RESULT_SET,
+            watch.elapsed(TimeUnit.MILLISECONDS)));
+    System.out.println(
+        String.format(
+            "Executed %.2f SELECT RANDOM statements with %d rows per second",
+            (double) NUMBER_OF_RANDOM_TEST_EXECUTIONS
+                / (double) watch.elapsed(TimeUnit.MILLISECONDS)
+                * 1000D,
+            ROW_COUNT_RANDOM_RESULT_SET));
   }
 
   @Test
   public void readOnlyTransactionRandomWithParamsTest()
       throws InterruptedException, ExecutionException, TimeoutException {
+    System.out.println("READ_ONLY_TX");
+    Stopwatch watch = Stopwatch.createStarted();
     readOnlyTransactionTest(
         new Function<ReadContext, Void>() {
           @Override
@@ -384,6 +506,20 @@ public class DatabaseClientStressTest {
           }
         },
         NUMBER_OF_RANDOM_TEST_EXECUTIONS / NUMBER_OF_QUERIES_IN_TX);
+    watch.stop();
+    System.out.println(
+        String.format(
+            "Executed %d SELECT RANDOM statements with parameters with %d rows in %dms",
+            NUMBER_OF_RANDOM_TEST_EXECUTIONS,
+            ROW_COUNT_RANDOM_RESULT_SET,
+            watch.elapsed(TimeUnit.MILLISECONDS)));
+    System.out.println(
+        String.format(
+            "Executed %.2f SELECT RANDOM statements with parameters with %d rows per second",
+            (double) NUMBER_OF_RANDOM_TEST_EXECUTIONS
+                / (double) watch.elapsed(TimeUnit.MILLISECONDS)
+                * 1000D,
+            ROW_COUNT_RANDOM_RESULT_SET));
   }
 
   private <T> void readOnlyTransactionTest(
@@ -410,6 +546,8 @@ public class DatabaseClientStressTest {
   @Test
   public void readWriteTransactionSelect1Test()
       throws InterruptedException, ExecutionException, TimeoutException {
+    System.out.println("READ_WRITE_TX");
+    Stopwatch watch = Stopwatch.createStarted();
     readWriteTransactionTest(
         new Function<TransactionContext, Void>() {
           @Override
@@ -419,11 +557,24 @@ public class DatabaseClientStressTest {
           }
         },
         NUMBER_OF_SELECT1_TEST_EXECUTIONS / NUMBER_OF_QUERIES_IN_TX);
+    watch.stop();
+    System.out.println(
+        String.format(
+            "Executed %d SELECT 1 statements in %dms",
+            NUMBER_OF_SELECT1_TEST_EXECUTIONS, watch.elapsed(TimeUnit.MILLISECONDS)));
+    System.out.println(
+        String.format(
+            "Executed %.2f SELECT 1 statements per second",
+            (double) NUMBER_OF_SELECT1_TEST_EXECUTIONS
+                / (double) watch.elapsed(TimeUnit.MILLISECONDS)
+                * 1000D));
   }
 
   @Test
   public void readWriteTransactionRandomTest()
       throws InterruptedException, ExecutionException, TimeoutException {
+    System.out.println("READ_WRITE_TX");
+    Stopwatch watch = Stopwatch.createStarted();
     readWriteTransactionTest(
         new Function<TransactionContext, Void>() {
           @Override
@@ -433,11 +584,27 @@ public class DatabaseClientStressTest {
           }
         },
         NUMBER_OF_RANDOM_TEST_EXECUTIONS / NUMBER_OF_QUERIES_IN_TX);
+    watch.stop();
+    System.out.println(
+        String.format(
+            "Executed %d SELECT RANDOM statements with %d rows in %dms",
+            NUMBER_OF_RANDOM_TEST_EXECUTIONS,
+            ROW_COUNT_RANDOM_RESULT_SET,
+            watch.elapsed(TimeUnit.MILLISECONDS)));
+    System.out.println(
+        String.format(
+            "Executed %.2f SELECT RANDOM statements with %d rows per second",
+            (double) NUMBER_OF_RANDOM_TEST_EXECUTIONS
+                / (double) watch.elapsed(TimeUnit.MILLISECONDS)
+                * 1000D,
+            ROW_COUNT_RANDOM_RESULT_SET));
   }
 
   @Test
   public void readWriteTransactionRandomWithParamsTest()
       throws InterruptedException, ExecutionException, TimeoutException {
+    System.out.println("READ_WRITE_TX");
+    Stopwatch watch = Stopwatch.createStarted();
     readWriteTransactionTest(
         new Function<TransactionContext, Void>() {
           @Override
@@ -447,6 +614,20 @@ public class DatabaseClientStressTest {
           }
         },
         NUMBER_OF_RANDOM_TEST_EXECUTIONS / NUMBER_OF_QUERIES_IN_TX);
+    watch.stop();
+    System.out.println(
+        String.format(
+            "Executed %d SELECT RANDOM statements with parameters with %d rows in %dms",
+            NUMBER_OF_RANDOM_TEST_EXECUTIONS,
+            ROW_COUNT_RANDOM_RESULT_SET,
+            watch.elapsed(TimeUnit.MILLISECONDS)));
+    System.out.println(
+        String.format(
+            "Executed %.2f SELECT RANDOM statements with parameters with %d rows per second",
+            (double) NUMBER_OF_RANDOM_TEST_EXECUTIONS
+                / (double) watch.elapsed(TimeUnit.MILLISECONDS)
+                * 1000D,
+            ROW_COUNT_RANDOM_RESULT_SET));
   }
 
   private <T> void readWriteTransactionTest(
@@ -480,6 +661,8 @@ public class DatabaseClientStressTest {
   @Test
   public void transactionManagerSelect1Test()
       throws InterruptedException, ExecutionException, TimeoutException {
+    System.out.println("TRANSACTION_MANAGER");
+    Stopwatch watch = Stopwatch.createStarted();
     transactionManagerTest(
         new Function<TransactionContext, Void>() {
           @Override
@@ -489,11 +672,24 @@ public class DatabaseClientStressTest {
           }
         },
         NUMBER_OF_SELECT1_TEST_EXECUTIONS / NUMBER_OF_QUERIES_IN_TX);
+    watch.stop();
+    System.out.println(
+        String.format(
+            "Executed %d SELECT 1 statements in %dms",
+            NUMBER_OF_SELECT1_TEST_EXECUTIONS, watch.elapsed(TimeUnit.MILLISECONDS)));
+    System.out.println(
+        String.format(
+            "Executed %.2f SELECT 1 statements per second",
+            (double) NUMBER_OF_SELECT1_TEST_EXECUTIONS
+                / (double) watch.elapsed(TimeUnit.MILLISECONDS)
+                * 1000D));
   }
 
   @Test
   public void transactionManagerRandomTest()
       throws InterruptedException, ExecutionException, TimeoutException {
+    System.out.println("TRANSACTION_MANAGER");
+    Stopwatch watch = Stopwatch.createStarted();
     transactionManagerTest(
         new Function<TransactionContext, Void>() {
           @Override
@@ -503,11 +699,27 @@ public class DatabaseClientStressTest {
           }
         },
         NUMBER_OF_RANDOM_TEST_EXECUTIONS / NUMBER_OF_QUERIES_IN_TX);
+    watch.stop();
+    System.out.println(
+        String.format(
+            "Executed %d SELECT RANDOM statements with %d rows in %dms",
+            NUMBER_OF_RANDOM_TEST_EXECUTIONS,
+            ROW_COUNT_RANDOM_RESULT_SET,
+            watch.elapsed(TimeUnit.MILLISECONDS)));
+    System.out.println(
+        String.format(
+            "Executed %.2f SELECT RANDOM statements with %d rows per second",
+            (double) NUMBER_OF_RANDOM_TEST_EXECUTIONS
+                / (double) watch.elapsed(TimeUnit.MILLISECONDS)
+                * 1000D,
+            ROW_COUNT_RANDOM_RESULT_SET));
   }
 
   @Test
   public void transactionManagerRandomWithParamsTest()
       throws InterruptedException, ExecutionException, TimeoutException {
+    System.out.println("TRANSACTION_MANAGER");
+    Stopwatch watch = Stopwatch.createStarted();
     transactionManagerTest(
         new Function<TransactionContext, Void>() {
           @Override
@@ -517,6 +729,20 @@ public class DatabaseClientStressTest {
           }
         },
         NUMBER_OF_RANDOM_TEST_EXECUTIONS / NUMBER_OF_QUERIES_IN_TX);
+    watch.stop();
+    System.out.println(
+        String.format(
+            "Executed %d SELECT RANDOM statements with parameters with %d rows in %dms",
+            NUMBER_OF_RANDOM_TEST_EXECUTIONS,
+            ROW_COUNT_RANDOM_RESULT_SET,
+            watch.elapsed(TimeUnit.MILLISECONDS)));
+    System.out.println(
+        String.format(
+            "Executed %.2f SELECT RANDOM statements with parameters with %d rows per second",
+            (double) NUMBER_OF_RANDOM_TEST_EXECUTIONS
+                / (double) watch.elapsed(TimeUnit.MILLISECONDS)
+                * 1000D,
+            ROW_COUNT_RANDOM_RESULT_SET));
   }
 
   private <T> void transactionManagerTest(
@@ -553,6 +779,8 @@ public class DatabaseClientStressTest {
   @Test
   public void readWriteTransactionUpdateTest()
       throws InterruptedException, ExecutionException, TimeoutException {
+    System.out.println("READ_WRITE_TX_UPDATE");
+    Stopwatch watch = Stopwatch.createStarted();
     final DatabaseClient dbClient =
         spanner.getDatabaseClient(DatabaseId.of(PROJECT_ID, INSTANCE_ID, DATABASE_ID));
     Callable<Void> callable =
@@ -578,11 +806,24 @@ public class DatabaseClientStressTest {
           }
         };
     runStressTest(callable, NUMBER_OF_UPDATE_TEST_EXECUTIONS / NUMBER_OF_UPDATES_IN_TX);
+    watch.stop();
+    System.out.println(
+        String.format(
+            "Executed %d UPDATE statements %dms",
+            NUMBER_OF_UPDATE_TEST_EXECUTIONS, watch.elapsed(TimeUnit.MILLISECONDS)));
+    System.out.println(
+        String.format(
+            "Executed %.2f UPDATE statements per second",
+            (double) NUMBER_OF_UPDATE_TEST_EXECUTIONS
+                / (double) watch.elapsed(TimeUnit.MILLISECONDS)
+                * 1000D));
   }
 
   @Test
   public void transactionManagerUpdateTest()
       throws InterruptedException, ExecutionException, TimeoutException {
+    System.out.println("TRANSACTION_MANAGER_UPDATE");
+    Stopwatch watch = Stopwatch.createStarted();
     final DatabaseClient dbClient =
         spanner.getDatabaseClient(DatabaseId.of(PROJECT_ID, INSTANCE_ID, DATABASE_ID));
     Callable<Void> callable =
@@ -610,6 +851,17 @@ public class DatabaseClientStressTest {
           }
         };
     runStressTest(callable, NUMBER_OF_UPDATE_TEST_EXECUTIONS / NUMBER_OF_UPDATES_IN_TX);
+    watch.stop();
+    System.out.println(
+        String.format(
+            "Executed %d UPDATE statements %dms",
+            NUMBER_OF_UPDATE_TEST_EXECUTIONS, watch.elapsed(TimeUnit.MILLISECONDS)));
+    System.out.println(
+        String.format(
+            "Executed %.2f UPDATE statements per second",
+            (double) NUMBER_OF_UPDATE_TEST_EXECUTIONS
+                / (double) watch.elapsed(TimeUnit.MILLISECONDS)
+                * 1000D));
   }
 
   /**
@@ -641,6 +893,8 @@ public class DatabaseClientStressTest {
   @Test
   public void readWriteTransactionBatchUpdateTest()
       throws InterruptedException, ExecutionException, TimeoutException {
+    System.out.println("READ_WRITE_TX_BATCH_UPDATE");
+    Stopwatch watch = Stopwatch.createStarted();
     final DatabaseClient dbClient =
         spanner.getDatabaseClient(DatabaseId.of(PROJECT_ID, INSTANCE_ID, DATABASE_ID));
     Callable<Void> callable =
@@ -668,11 +922,24 @@ public class DatabaseClientStressTest {
           }
         };
     runStressTest(callable, NUMBER_OF_UPDATE_TEST_EXECUTIONS / NUMBER_OF_UPDATES_IN_TX);
+    watch.stop();
+    System.out.println(
+        String.format(
+            "Executed %d BATCH UPDATE statements %dms",
+            NUMBER_OF_UPDATE_TEST_EXECUTIONS, watch.elapsed(TimeUnit.MILLISECONDS)));
+    System.out.println(
+        String.format(
+            "Executed %.2f BATCH UPDATE statements per second",
+            (double) NUMBER_OF_UPDATE_TEST_EXECUTIONS
+                / (double) watch.elapsed(TimeUnit.MILLISECONDS)
+                * 1000D));
   }
 
   @Test
   public void transactionManagerBatchUpdateTest()
       throws InterruptedException, ExecutionException, TimeoutException {
+    System.out.println("TRANSACTION_MANAGER_BATCH_UPDATE");
+    Stopwatch watch = Stopwatch.createStarted();
     final DatabaseClient dbClient =
         spanner.getDatabaseClient(DatabaseId.of(PROJECT_ID, INSTANCE_ID, DATABASE_ID));
     Callable<Void> callable =
@@ -703,6 +970,17 @@ public class DatabaseClientStressTest {
           }
         };
     runStressTest(callable, NUMBER_OF_UPDATE_TEST_EXECUTIONS / NUMBER_OF_UPDATES_IN_TX);
+    watch.stop();
+    System.out.println(
+        String.format(
+            "Executed %d BATCH UPDATE statements %dms",
+            NUMBER_OF_UPDATE_TEST_EXECUTIONS, watch.elapsed(TimeUnit.MILLISECONDS)));
+    System.out.println(
+        String.format(
+            "Executed %.2f BATCH UPDATE statements per second",
+            (double) NUMBER_OF_UPDATE_TEST_EXECUTIONS
+                / (double) watch.elapsed(TimeUnit.MILLISECONDS)
+                * 1000D));
   }
 
   @Test
