@@ -209,7 +209,9 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
   /** The result of a statement that is executed on a {@link MockSpannerServiceImpl}. */
   public static class StatementResult {
     private enum StatementResultType {
-      RESULT_SET, UPDATE_COUNT, EXCEPTION;
+      RESULT_SET,
+      UPDATE_COUNT,
+      EXCEPTION;
     }
 
     private final StatementResultType type;
@@ -263,19 +265,22 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
 
     private ResultSet getResultSet() {
       Preconditions.checkState(
-          type == StatementResultType.RESULT_SET, "This statement result does not contain a result set");
+          type == StatementResultType.RESULT_SET,
+          "This statement result does not contain a result set");
       return resultSet;
     }
 
     private Long getUpdateCount() {
       Preconditions.checkState(
-          type == StatementResultType.UPDATE_COUNT, "This statement result does not contain an update count");
+          type == StatementResultType.UPDATE_COUNT,
+          "This statement result does not contain an update count");
       return updateCount;
     }
 
     private StatusRuntimeException getException() {
       Preconditions.checkState(
-          type == StatementResultType.EXCEPTION, "This statement result does not contain an exception");
+          type == StatementResultType.EXCEPTION,
+          "This statement result does not contain an exception");
       return exception;
     }
   }
@@ -344,14 +349,14 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
 
   private StatementResult getResult(Statement statement) {
     StatementResult res = statementResults.get(statement);
-    if(res == null) {
-    throw Status.INTERNAL
-    .withDescription(
-        String.format(
-            "There is no result registered for the statement: %s\n"
-                + "Call TestSpannerImpl#addStatementResult(StatementResult) before executing the statement.",
-            statement.toString()))
-    .asRuntimeException();
+    if (res == null) {
+      throw Status.INTERNAL
+          .withDescription(
+              String.format(
+                  "There is no result registered for the statement: %s\n"
+                      + "Call TestSpannerImpl#addStatementResult(StatementResult) before executing the statement.",
+                  statement.toString()))
+          .asRuntimeException();
     }
     return res;
   }
@@ -491,7 +496,7 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
       Statement statement =
           buildStatement(request.getSql(), request.getParamTypesMap(), request.getParams());
       StatementResult result = getResult(statement);
-      switch(result.getType()) {
+      switch (result.getType()) {
         case EXCEPTION:
           throw result.getException();
         case RESULT_SET:
@@ -510,7 +515,9 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
             responseObserver.onNext(
                 ResultSet.newBuilder()
                     .setStats(
-                        ResultSetStats.newBuilder().setRowCountExact(result.getUpdateCount()).build())
+                        ResultSetStats.newBuilder()
+                            .setRowCountExact(result.getUpdateCount())
+                            .build())
                     .build());
           }
           break;
@@ -564,11 +571,13 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
               buildStatement(
                   statement.getSql(), statement.getParamTypesMap(), statement.getParams());
           StatementResult res = getResult(spannerStatement);
-          switch(res.getType()) {
+          switch (res.getType()) {
             case EXCEPTION:
               throw res.getException();
             case RESULT_SET:
-              throw Status.INVALID_ARGUMENT.withDescription("Not a DML statement: " + statement.getSql()).asRuntimeException();
+              throw Status.INVALID_ARGUMENT
+                  .withDescription("Not a DML statement: " + statement.getSql())
+                  .asRuntimeException();
             case UPDATE_COUNT:
               results.add(res);
               break;
@@ -634,7 +643,7 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
       Statement statement =
           buildStatement(request.getSql(), request.getParamTypesMap(), request.getParams());
       StatementResult res = getResult(statement);
-      switch(res.getType()) {
+      switch (res.getType()) {
         case EXCEPTION:
           throw res.getException();
         case RESULT_SET:
