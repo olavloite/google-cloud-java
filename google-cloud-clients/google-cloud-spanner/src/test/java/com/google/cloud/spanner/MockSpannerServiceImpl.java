@@ -22,10 +22,10 @@ import com.google.cloud.Date;
 import com.google.cloud.spanner.SpannerImpl.TransactionContextImpl;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.Empty;
-import com.google.protobuf.GeneratedMessageV3;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.Value.KindCase;
 import com.google.rpc.Code;
@@ -292,12 +292,18 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
     private final int randomExecutionTime;
 
     /**
-     * Creates a simulated execution time that will always be somewhere between <code>minimumExecutionTime+randomExecutionTime</code> milliseconds long.
-     * @param minimumExecutionTime The minimum number of milliseconds the execution of the method should be.
-     * @param randomExecutionTime The maximum random number of milliseconds that should be added to the minimum execution time.
-     * @return a {@link SimulatedExecutionTime} that can be set as the execution time of a server call on a {@link MockSpannerServiceImpl}.
+     * Creates a simulated execution time that will always be somewhere between <code>
+     * minimumExecutionTime+randomExecutionTime</code> milliseconds long.
+     *
+     * @param minimumExecutionTime The minimum number of milliseconds the execution of the method
+     *     should be.
+     * @param randomExecutionTime The maximum random number of milliseconds that should be added to
+     *     the minimum execution time.
+     * @return a {@link SimulatedExecutionTime} that can be set as the execution time of a server
+     *     call on a {@link MockSpannerServiceImpl}.
      */
-    public static SimulatedExecutionTime ofMinimumAndRandomTime(int minimumExecutionTime, int randomExecutionTime) {
+    public static SimulatedExecutionTime ofMinimumAndRandomTime(
+        int minimumExecutionTime, int randomExecutionTime) {
       return new SimulatedExecutionTime(minimumExecutionTime, randomExecutionTime);
     }
 
@@ -309,7 +315,7 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
     }
 
     private void simulateExecutionTime() {
-      if(minimumExecutionTime > 0L || randomExecutionTime > 0L) {
+      if (minimumExecutionTime > 0L || randomExecutionTime > 0L) {
         try {
           Thread.sleep(RANDOM.nextInt(randomExecutionTime) + minimumExecutionTime);
         } catch (InterruptedException e) {
@@ -318,6 +324,7 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
       }
     }
   }
+
   public static final SimulatedExecutionTime NO_EXECUTION_TIME = new SimulatedExecutionTime(0, 0);
 
   private final Random random = new Random();
@@ -709,7 +716,7 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
           break;
         case UPDATE_COUNT:
           boolean isPartitioned = isPartitionedDmlTransaction(transactionId);
-          if(isPartitioned) {
+          if (isPartitioned) {
             commitTransaction(transactionId);
           }
           returnPartialResultSet(
@@ -1205,12 +1212,12 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
   }
 
   @Override
-  public List<GeneratedMessageV3> getRequests() {
+  public List<AbstractMessage> getRequests() {
     return Collections.emptyList();
   }
 
   @Override
-  public void addResponse(GeneratedMessageV3 response) {
+  public void addResponse(AbstractMessage response) {
     throw new UnsupportedOperationException();
   }
 
@@ -1241,7 +1248,8 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
     return beginTransactionExecutionTime;
   }
 
-  public void setBeginTransactionExecutionTime(SimulatedExecutionTime beginTransactionExecutionTime) {
+  public void setBeginTransactionExecutionTime(
+      SimulatedExecutionTime beginTransactionExecutionTime) {
     this.beginTransactionExecutionTime = Preconditions.checkNotNull(beginTransactionExecutionTime);
   }
 
@@ -1291,7 +1299,8 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
 
   public void setExecuteStreamingSqlExecutionTime(
       SimulatedExecutionTime executeStreamingSqlExecutionTime) {
-    this.executeStreamingSqlExecutionTime = Preconditions.checkNotNull(executeStreamingSqlExecutionTime);
+    this.executeStreamingSqlExecutionTime =
+        Preconditions.checkNotNull(executeStreamingSqlExecutionTime);
   }
 
   public SimulatedExecutionTime getGetSessionExecutionTime() {
