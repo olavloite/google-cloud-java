@@ -165,7 +165,7 @@ import org.threeten.bp.Instant;
  * }</pre>
  */
 public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcService {
-  static class PartialResultSetsIterator implements Iterator<PartialResultSet> {
+  private static class PartialResultSetsIterator implements Iterator<PartialResultSet> {
     private static final int MAX_ROWS_IN_CHUNK = 10;
 
     private final ResultSet resultSet;
@@ -209,7 +209,9 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
   /** The result of a statement that is executed on a {@link MockSpannerServiceImpl}. */
   public static class StatementResult {
     private enum StatementResultType {
-      RESULT_SET, UPDATE_COUNT, EXCEPTION;
+      RESULT_SET,
+      UPDATE_COUNT,
+      EXCEPTION;
     }
 
     private final StatementResultType type;
@@ -263,22 +265,60 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
 
     private ResultSet getResultSet() {
       Preconditions.checkState(
-          type == StatementResultType.RESULT_SET, "This statement result does not contain a result set");
+          type == StatementResultType.RESULT_SET,
+          "This statement result does not contain a result set");
       return resultSet;
     }
 
     private Long getUpdateCount() {
       Preconditions.checkState(
-          type == StatementResultType.UPDATE_COUNT, "This statement result does not contain an update count");
+          type == StatementResultType.UPDATE_COUNT,
+          "This statement result does not contain an update count");
       return updateCount;
     }
 
     private StatusRuntimeException getException() {
       Preconditions.checkState(
-          type == StatementResultType.EXCEPTION, "This statement result does not contain an exception");
+          type == StatementResultType.EXCEPTION,
+          "This statement result does not contain an exception");
       return exception;
     }
   }
+
+  /** Class for simulating execution time of server calls. */
+  public static class SimulatedExecutionTime {
+    private static final Random RANDOM = new Random();
+    private final int minimumExecutionTime;
+    private final int randomExecutionTime;
+
+    /**
+     * Creates a simulated execution time that will always be somewhere between <code>minimumExecutionTime+randomExecutionTime</code> milliseconds long.
+     * @param minimumExecutionTime The minimum number of milliseconds the execution of the method should be.
+     * @param randomExecutionTime The maximum random number of milliseconds that should be added to the minimum execution time.
+     * @return a {@link SimulatedExecutionTime} that can be set as the execution time of a server call on a {@link MockSpannerServiceImpl}.
+     */
+    public static SimulatedExecutionTime ofMinimumAndRandomTime(int minimumExecutionTime, int randomExecutionTime) {
+      return new SimulatedExecutionTime(minimumExecutionTime, randomExecutionTime);
+    }
+
+    private SimulatedExecutionTime(int minimum, int random) {
+      Preconditions.checkArgument(minimum >= 0, "Minimum execution time must be >= 0");
+      Preconditions.checkArgument(random >= 0, "Random execution time must be >= 0");
+      this.minimumExecutionTime = minimum;
+      this.randomExecutionTime = random;
+    }
+
+    private void simulateExecutionTime() {
+      if(minimumExecutionTime > 0L || randomExecutionTime > 0L) {
+        try {
+          Thread.sleep(RANDOM.nextInt(randomExecutionTime) + minimumExecutionTime);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+      }
+    }
+  }
+  public static final SimulatedExecutionTime NO_EXECUTION_TIME = new SimulatedExecutionTime(0, 0);
 
   private final Random random = new Random();
   private double abortProbability = 0.0010D;
@@ -294,6 +334,21 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
   private final ConcurrentMap<String, AtomicLong> transactionCounters = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, List<ByteString>> partitionTokens = new ConcurrentHashMap<>();
   private ConcurrentMap<ByteString, Instant> transactionLastUsed = new ConcurrentHashMap<>();
+
+  private SimulatedExecutionTime beginTransactionExecutionTime = NO_EXECUTION_TIME;
+  private SimulatedExecutionTime commitExecutionTime = NO_EXECUTION_TIME;
+  private SimulatedExecutionTime createSessionExecutionTime = NO_EXECUTION_TIME;
+  private SimulatedExecutionTime deleteSessionExecutionTime = NO_EXECUTION_TIME;
+  private SimulatedExecutionTime executeBatchDmlExecutionTime = NO_EXECUTION_TIME;
+  private SimulatedExecutionTime executeSqlExecutionTime = NO_EXECUTION_TIME;
+  private SimulatedExecutionTime executeStreamingSqlExecutionTime = NO_EXECUTION_TIME;
+  private SimulatedExecutionTime getSessionExecutionTime = NO_EXECUTION_TIME;
+  private SimulatedExecutionTime listSessionsExecutionTime = NO_EXECUTION_TIME;
+  private SimulatedExecutionTime partitionQueryExecutionTime = NO_EXECUTION_TIME;
+  private SimulatedExecutionTime partitionReadExecutionTime = NO_EXECUTION_TIME;
+  private SimulatedExecutionTime readExecutionTime = NO_EXECUTION_TIME;
+  private SimulatedExecutionTime rollbackExecutionTime = NO_EXECUTION_TIME;
+  private SimulatedExecutionTime streamingReadExecutionTime = NO_EXECUTION_TIME;
 
   private String generateSessionName(String database) {
     return String.format("%s/sessions/%s", database, UUID.randomUUID().toString());
@@ -344,14 +399,14 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
 
   private StatementResult getResult(Statement statement) {
     StatementResult res = statementResults.get(statement);
-    if(res == null) {
-    throw Status.INTERNAL
-    .withDescription(
-        String.format(
-            "There is no result registered for the statement: %s\n"
-                + "Call TestSpannerImpl#addStatementResult(StatementResult) before executing the statement.",
-            statement.toString()))
-    .asRuntimeException();
+    if (res == null) {
+      throw Status.INTERNAL
+          .withDescription(
+              String.format(
+                  "There is no result registered for the statement: %s\n"
+                      + "Call TestSpannerImpl#addStatementResult(StatementResult) before executing the statement.",
+                  statement.toString()))
+          .asRuntimeException();
     }
     return res;
   }
@@ -386,6 +441,7 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
   public void createSession(
       CreateSessionRequest request, StreamObserver<Session> responseObserver) {
     Preconditions.checkNotNull(request.getDatabase());
+    createSessionExecutionTime.simulateExecutionTime();
     String name = generateSessionName(request.getDatabase());
     try {
       Timestamp now = getCurrentGoogleTimestamp();
@@ -416,6 +472,7 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
   @Override
   public void getSession(GetSessionRequest request, StreamObserver<Session> responseObserver) {
     Preconditions.checkNotNull(request.getName());
+    getSessionExecutionTime.simulateExecutionTime();
     Session session = sessions.get(request.getName());
     if (session == null) {
       setSessionNotFound(request.getName(), responseObserver);
@@ -436,6 +493,7 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
   @Override
   public void listSessions(
       ListSessionsRequest request, StreamObserver<ListSessionsResponse> responseObserver) {
+    listSessionsExecutionTime.simulateExecutionTime();
     List<Session> res = new ArrayList<>();
     for (Session session : sessions.values()) {
       if (session.getName().startsWith(request.getDatabase())) {
@@ -457,6 +515,7 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
   @Override
   public void deleteSession(DeleteSessionRequest request, StreamObserver<Empty> responseObserver) {
     Preconditions.checkNotNull(request.getName());
+    deleteSessionExecutionTime.simulateExecutionTime();
     Session session = sessions.get(request.getName());
     if (session != null) {
       try {
@@ -485,13 +544,14 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
       return;
     }
     sessionLastUsed.put(session.getName(), Instant.now());
+    executeSqlExecutionTime.simulateExecutionTime();
     try {
       ByteString transactionId = getTransactionId(session, request.getTransaction());
       simulateAbort(session, transactionId);
       Statement statement =
           buildStatement(request.getSql(), request.getParamTypesMap(), request.getParams());
       StatementResult result = getResult(statement);
-      switch(result.getType()) {
+      switch (result.getType()) {
         case EXCEPTION:
           throw result.getException();
         case RESULT_SET:
@@ -499,6 +559,7 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
           break;
         case UPDATE_COUNT:
           if (isPartitionedDmlTransaction(transactionId)) {
+            commitTransaction(transactionId);
             responseObserver.onNext(
                 ResultSet.newBuilder()
                     .setStats(
@@ -510,7 +571,9 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
             responseObserver.onNext(
                 ResultSet.newBuilder()
                     .setStats(
-                        ResultSetStats.newBuilder().setRowCountExact(result.getUpdateCount()).build())
+                        ResultSetStats.newBuilder()
+                            .setRowCountExact(result.getUpdateCount())
+                            .build())
                     .build());
           }
           break;
@@ -544,6 +607,7 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
       return;
     }
     sessionLastUsed.put(session.getName(), Instant.now());
+    executeBatchDmlExecutionTime.simulateExecutionTime();
     try {
       // Get or start transaction
       ByteString transactionId = getTransactionId(session, request.getTransaction());
@@ -564,11 +628,13 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
               buildStatement(
                   statement.getSql(), statement.getParamTypesMap(), statement.getParams());
           StatementResult res = getResult(spannerStatement);
-          switch(res.getType()) {
+          switch (res.getType()) {
             case EXCEPTION:
               throw res.getException();
             case RESULT_SET:
-              throw Status.INVALID_ARGUMENT.withDescription("Not a DML statement: " + statement.getSql()).asRuntimeException();
+              throw Status.INVALID_ARGUMENT
+                  .withDescription("Not a DML statement: " + statement.getSql())
+                  .asRuntimeException();
             case UPDATE_COUNT:
               results.add(res);
               break;
@@ -617,6 +683,7 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
       return;
     }
     sessionLastUsed.put(session.getName(), Instant.now());
+    executeStreamingSqlExecutionTime.simulateExecutionTime();
     try {
       // Get or start transaction
       ByteString transactionId = getTransactionId(session, request.getTransaction());
@@ -634,17 +701,21 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
       Statement statement =
           buildStatement(request.getSql(), request.getParamTypesMap(), request.getParams());
       StatementResult res = getResult(statement);
-      switch(res.getType()) {
+      switch (res.getType()) {
         case EXCEPTION:
           throw res.getException();
         case RESULT_SET:
           returnPartialResultSet(res.getResultSet(), request.getTransaction(), responseObserver);
           break;
         case UPDATE_COUNT:
+          boolean isPartitioned = isPartitionedDmlTransaction(transactionId);
+          if(isPartitioned) {
+            commitTransaction(transactionId);
+          }
           returnPartialResultSet(
               session,
               res.getUpdateCount(),
-              !isPartitionedDmlTransaction(transactionId),
+              !isPartitioned,
               responseObserver,
               request.getTransaction());
           break;
@@ -653,6 +724,8 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
       }
     } catch (StatusRuntimeException e) {
       responseObserver.onError(e);
+    } catch (Throwable t) {
+      responseObserver.onError(t);
     }
   }
 
@@ -768,6 +841,7 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
       return;
     }
     sessionLastUsed.put(session.getName(), Instant.now());
+    readExecutionTime.simulateExecutionTime();
     try {
       // Get or start transaction
       ByteString transactionId = getTransactionId(session, request.getTransaction());
@@ -791,6 +865,7 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
       return;
     }
     sessionLastUsed.put(session.getName(), Instant.now());
+    streamingReadExecutionTime.simulateExecutionTime();
     try {
       // Get or start transaction
       ByteString transactionId = getTransactionId(session, request.getTransaction());
@@ -934,6 +1009,7 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
       return;
     }
     sessionLastUsed.put(session.getName(), Instant.now());
+    beginTransactionExecutionTime.simulateExecutionTime();
     try {
       Transaction transaction = beginTransaction(session, request.getOptions());
       responseObserver.onNext(transaction);
@@ -1015,6 +1091,7 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
       return;
     }
     sessionLastUsed.put(session.getName(), Instant.now());
+    commitExecutionTime.simulateExecutionTime();
     // Find or start a transaction
     Transaction transaction;
     if (request.hasSingleUseTransaction()) {
@@ -1066,6 +1143,7 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
       return;
     }
     sessionLastUsed.put(session.getName(), Instant.now());
+    rollbackExecutionTime.simulateExecutionTime();
     Transaction transaction = transactions.get(request.getTransactionId());
     if (transaction != null) {
       rollbackTransaction(transaction.getId());
@@ -1090,12 +1168,14 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
   @Override
   public void partitionQuery(
       PartitionQueryRequest request, StreamObserver<PartitionResponse> responseObserver) {
+    partitionQueryExecutionTime.simulateExecutionTime();
     partition(request.getSession(), request.getTransaction(), responseObserver);
   }
 
   @Override
   public void partitionRead(
       PartitionReadRequest request, StreamObserver<PartitionResponse> responseObserver) {
+    partitionReadExecutionTime.simulateExecutionTime();
     partition(request.getSession(), request.getTransaction(), responseObserver);
   }
 
@@ -1155,5 +1235,118 @@ public class MockSpannerServiceImpl extends SpannerImplBase implements MockGrpcS
     transactionCounters.clear();
     partitionTokens.clear();
     transactionLastUsed.clear();
+  }
+
+  public SimulatedExecutionTime getBeginTransactionExecutionTime() {
+    return beginTransactionExecutionTime;
+  }
+
+  public void setBeginTransactionExecutionTime(SimulatedExecutionTime beginTransactionExecutionTime) {
+    this.beginTransactionExecutionTime = Preconditions.checkNotNull(beginTransactionExecutionTime);
+  }
+
+  public SimulatedExecutionTime getCommitExecutionTime() {
+    return commitExecutionTime;
+  }
+
+  public void setCommitExecutionTime(SimulatedExecutionTime commitExecutionTime) {
+    this.commitExecutionTime = Preconditions.checkNotNull(commitExecutionTime);
+  }
+
+  public SimulatedExecutionTime getCreateSessionExecutionTime() {
+    return createSessionExecutionTime;
+  }
+
+  public void setCreateSessionExecutionTime(SimulatedExecutionTime createSessionExecutionTime) {
+    this.createSessionExecutionTime = Preconditions.checkNotNull(createSessionExecutionTime);
+  }
+
+  public SimulatedExecutionTime getDeleteSessionExecutionTime() {
+    return deleteSessionExecutionTime;
+  }
+
+  public void setDeleteSessionExecutionTime(SimulatedExecutionTime deleteSessionExecutionTime) {
+    this.deleteSessionExecutionTime = Preconditions.checkNotNull(deleteSessionExecutionTime);
+  }
+
+  public SimulatedExecutionTime getExecuteBatchDmlExecutionTime() {
+    return executeBatchDmlExecutionTime;
+  }
+
+  public void setExecuteBatchDmlExecutionTime(SimulatedExecutionTime executeBatchDmlExecutionTime) {
+    this.executeBatchDmlExecutionTime = Preconditions.checkNotNull(executeBatchDmlExecutionTime);
+  }
+
+  public SimulatedExecutionTime getExecuteSqlExecutionTime() {
+    return executeSqlExecutionTime;
+  }
+
+  public void setExecuteSqlExecutionTime(SimulatedExecutionTime executeSqlExecutionTime) {
+    this.executeSqlExecutionTime = Preconditions.checkNotNull(executeSqlExecutionTime);
+  }
+
+  public SimulatedExecutionTime getExecuteStreamingSqlExecutionTime() {
+    return executeStreamingSqlExecutionTime;
+  }
+
+  public void setExecuteStreamingSqlExecutionTime(
+      SimulatedExecutionTime executeStreamingSqlExecutionTime) {
+    this.executeStreamingSqlExecutionTime = Preconditions.checkNotNull(executeStreamingSqlExecutionTime);
+  }
+
+  public SimulatedExecutionTime getGetSessionExecutionTime() {
+    return getSessionExecutionTime;
+  }
+
+  public void setGetSessionExecutionTime(SimulatedExecutionTime getSessionExecutionTime) {
+    this.getSessionExecutionTime = Preconditions.checkNotNull(getSessionExecutionTime);
+  }
+
+  public SimulatedExecutionTime getListSessionsExecutionTime() {
+    return listSessionsExecutionTime;
+  }
+
+  public void setListSessionsExecutionTime(SimulatedExecutionTime listSessionsExecutionTime) {
+    this.listSessionsExecutionTime = Preconditions.checkNotNull(listSessionsExecutionTime);
+  }
+
+  public SimulatedExecutionTime getPartitionQueryExecutionTime() {
+    return partitionQueryExecutionTime;
+  }
+
+  public void setPartitionQueryExecutionTime(SimulatedExecutionTime partitionQueryExecutionTime) {
+    this.partitionQueryExecutionTime = Preconditions.checkNotNull(partitionQueryExecutionTime);
+  }
+
+  public SimulatedExecutionTime getPartitionReadExecutionTime() {
+    return partitionReadExecutionTime;
+  }
+
+  public void setPartitionReadExecutionTime(SimulatedExecutionTime partitionReadExecutionTime) {
+    this.partitionReadExecutionTime = Preconditions.checkNotNull(partitionReadExecutionTime);
+  }
+
+  public SimulatedExecutionTime getReadExecutionTime() {
+    return readExecutionTime;
+  }
+
+  public void setReadExecutionTime(SimulatedExecutionTime readExecutionTime) {
+    this.readExecutionTime = Preconditions.checkNotNull(readExecutionTime);
+  }
+
+  public SimulatedExecutionTime getRollbackExecutionTime() {
+    return rollbackExecutionTime;
+  }
+
+  public void setRollbackExecutionTime(SimulatedExecutionTime rollbackExecutionTime) {
+    this.rollbackExecutionTime = Preconditions.checkNotNull(rollbackExecutionTime);
+  }
+
+  public SimulatedExecutionTime getStreamingReadExecutionTime() {
+    return streamingReadExecutionTime;
+  }
+
+  public void setStreamingReadExecutionTime(SimulatedExecutionTime streamingReadExecutionTime) {
+    this.streamingReadExecutionTime = Preconditions.checkNotNull(streamingReadExecutionTime);
   }
 }
