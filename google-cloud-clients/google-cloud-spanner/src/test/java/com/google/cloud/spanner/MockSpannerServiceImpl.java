@@ -19,7 +19,7 @@ package com.google.cloud.spanner;
 import com.google.api.gax.grpc.testing.MockGrpcService;
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
-import com.google.cloud.spanner.SpannerImpl.TransactionContextImpl;
+import com.google.cloud.spanner.TransactionRunnerImpl.TransactionContextImpl;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.AbstractMessage;
