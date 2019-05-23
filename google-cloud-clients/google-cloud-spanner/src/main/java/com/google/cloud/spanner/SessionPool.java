@@ -37,6 +37,7 @@ import io.opencensus.trace.Annotation;
 import io.opencensus.trace.AttributeValue;
 import io.opencensus.trace.Span;
 import io.opencensus.trace.Tracing;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -77,7 +78,7 @@ final class SessionPool {
    * Wrapper around {@code ReadContext} that releases the session to the pool once the call is
    * finished, if it is a single use context.
    */
-  private static class AutoClosingReadContext<T extends ReadContext> implements ReadContext {
+  static class AutoClosingReadContext<T extends ReadContext> implements ReadContext {
     private final Function<PooledSession, T> readContextDelegateSupplier;
     private T readContextDelegate;
     private final SessionPool sessionPool;
@@ -1001,10 +1002,10 @@ final class SessionPool {
   private SettableFuture<Void> closureFuture;
 
   @GuardedBy("lock")
-  private final Queue<PooledSession> readSessions = new LinkedList<>();
+  private final Deque<PooledSession> readSessions = new LinkedList<>();
 
   @GuardedBy("lock")
-  private final Queue<PooledSession> writePreparedSessions = new LinkedList<>();
+  private final Deque<PooledSession> writePreparedSessions = new LinkedList<>();
 
   @GuardedBy("lock")
   private final Queue<Waiter> readWaiters = new LinkedList<>();
@@ -1320,7 +1321,11 @@ final class SessionPool {
         if (shouldPrepareSession()) {
           prepareSession(session);
         } else {
-          readSessions.add(session);
+          if(options.isUseLifo()) {
+            readSessions.addFirst(session);
+          } else {
+            readSessions.add(session);
+          }
         }
       } else if (shouldUnblockReader()) {
         readWaiters.poll().put(session);
@@ -1492,7 +1497,11 @@ final class SessionPool {
                   } else if (readWaiters.size() > 0) {
                     readWaiters.poll().put(sess);
                   } else {
-                    writePreparedSessions.add(sess);
+                    if(options.isUseLifo()) {
+                      writePreparedSessions.addFirst(sess);
+                    } else {
+                      writePreparedSessions.add(sess);
+                    }
                   }
                 }
               }

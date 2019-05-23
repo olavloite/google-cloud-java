@@ -31,6 +31,7 @@ public class SessionPoolOptions {
   private final ActionOnExhaustion actionOnExhaustion;
   private final int keepAliveIntervalMinutes;
   private final ActionOnSessionNotFound actionOnSessionNotFound;
+  private final boolean useLifo;
 
   private SessionPoolOptions(Builder builder) {
     this.minSessions = builder.minSessions;
@@ -40,6 +41,7 @@ public class SessionPoolOptions {
     this.actionOnExhaustion = builder.actionOnExhaustion;
     this.actionOnSessionNotFound = builder.actionOnSessionNotFound;
     this.keepAliveIntervalMinutes = builder.keepAliveIntervalMinutes;
+    this.useLifo = builder.useLifo;
   }
 
   public int getMinSessions() {
@@ -70,6 +72,10 @@ public class SessionPoolOptions {
     return actionOnExhaustion == ActionOnExhaustion.BLOCK;
   }
 
+  public boolean isUseLifo() {
+    return useLifo;
+  }
+
   @VisibleForTesting
   boolean isFailIfSessionNotFound() {
     return actionOnSessionNotFound == ActionOnSessionNotFound.FAIL;
@@ -98,6 +104,7 @@ public class SessionPoolOptions {
     private ActionOnExhaustion actionOnExhaustion = DEFAULT_ACTION;
     private ActionOnSessionNotFound actionOnSessionNotFound = ActionOnSessionNotFound.RETRY;
     private int keepAliveIntervalMinutes = 30;
+    private boolean useLifo = false;
 
     /**
      * Minimum number of sessions that this pool will always maintain. These will be created eagerly
@@ -180,6 +187,11 @@ public class SessionPoolOptions {
      */
     public Builder setWriteSessionsFraction(float writeSessionsFraction) {
       this.writeSessionsFraction = writeSessionsFraction;
+      return this;
+    }
+
+    public Builder useLifo() {
+      this.useLifo = true;
       return this;
     }
 
