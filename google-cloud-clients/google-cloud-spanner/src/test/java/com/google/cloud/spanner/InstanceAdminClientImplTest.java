@@ -21,21 +21,37 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.initMocks;
 
+import com.google.api.gax.grpc.testing.LocalChannelProvider;
 import com.google.api.gax.longrunning.OperationFuture;
+import com.google.api.gax.longrunning.OperationTimedPollAlgorithm;
+import com.google.api.gax.retrying.RetrySettings;
+import com.google.cloud.NoCredentials;
+import com.google.cloud.spanner.admin.instance.v1.MockInstanceAdmin;
 import com.google.cloud.spanner.spi.v1.SpannerRpc;
 import com.google.cloud.spanner.spi.v1.SpannerRpc.Paginated;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.longrunning.MockOperations;
+import com.google.protobuf.Any;
 import com.google.protobuf.FieldMask;
 import com.google.spanner.admin.instance.v1.CreateInstanceMetadata;
 import com.google.spanner.admin.instance.v1.InstanceConfig;
+import com.google.spanner.admin.instance.v1.InstanceConfigName;
+import com.google.spanner.admin.instance.v1.InstanceName;
 import com.google.spanner.admin.instance.v1.UpdateInstanceMetadata;
+import io.grpc.Server;
+import io.grpc.inprocess.InProcessServerBuilder;
+import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mock;
+import org.threeten.bp.Duration;
 
 /** Unit tests for {@link com.google.cloud.spanner.SpannerImpl.InstanceAdminClientImpl}. */
 @RunWith(JUnit4.class)
@@ -51,11 +67,42 @@ public class InstanceAdminClientImplTest {
   @Mock SpannerRpc rpc;
   @Mock DatabaseAdminClient dbClient;
   InstanceAdminClientImpl client;
+  private static MockInstanceAdmin mockInstanceAdmin;
+  private static MockOperations mockOperations;
+  private static Server server;
+  private static LocalChannelProvider channelProvider;
 
   @Before
   public void setUp() {
     initMocks(this);
     client = new InstanceAdminClientImpl(PROJECT_ID, rpc, dbClient);
+  }
+
+  @BeforeClass
+  public static void startStaticServer() throws IOException {
+    mockInstanceAdmin = new MockInstanceAdmin();
+    mockOperations = new MockOperations();
+    String uniqueName = InProcessServerBuilder.generateName();
+    server =
+        InProcessServerBuilder.forName(uniqueName)
+            .scheduledExecutorService(new ScheduledThreadPoolExecutor(1))
+            .addService(mockInstanceAdmin.getServiceDefinition())
+            .addService(mockOperations.getServiceDefinition())
+            .build()
+            .start();
+    channelProvider = LocalChannelProvider.create(uniqueName);
+  }
+
+  @AfterClass
+  public static void stopServer() throws InterruptedException {
+    server.shutdown();
+    server.awaitTermination();
+  }
+
+  @Before
+  public void setUpMockServer() throws IOException {
+    mockInstanceAdmin.reset();
+    mockOperations.reset();
   }
 
   @Test
@@ -116,6 +163,62 @@ public class InstanceAdminClientImplTest {
                 .build());
     assertThat(op.isDone()).isTrue();
     assertThat(op.get().getId().getName()).isEqualTo(INSTANCE_NAME);
+  }
+
+  @Test
+  public void createInstanceTest() throws Exception {
+    InstanceName name = InstanceName.of("[PROJECT]", "[INSTANCE]");
+    InstanceConfigName config = InstanceConfigName.of("[PROJECT]", "[INSTANCE_CONFIG]");
+    String displayName = "displayName1615086568";
+    int nodeCount = 1539922066;
+    com.google.spanner.admin.instance.v1.Instance expectedResponse =
+        com.google.spanner.admin.instance.v1.Instance.newBuilder()
+            .setName(name.toString())
+            .setConfig(config.toString())
+            .setDisplayName(displayName)
+            .setNodeCount(nodeCount)
+            .build();
+    com.google.longrunning.Operation resultOperation =
+        com.google.longrunning.Operation.newBuilder()
+            .setName("createInstanceTest")
+            .setDone(false)
+            .setResponse(Any.getDefaultInstance())
+            .build();
+    com.google.longrunning.Operation resultOperationFinished =
+        com.google.longrunning.Operation.newBuilder()
+            .setName("createInstanceTest")
+            .setDone(true)
+            .setResponse(Any.pack(expectedResponse))
+            .build();
+    mockInstanceAdmin.addResponse(resultOperation);
+    mockOperations.addResponse(resultOperation);
+    mockOperations.addResponse(resultOperationFinished);
+
+    SpannerOptions.Builder builder =
+        SpannerOptions.newBuilder()
+            .setChannelProvider(channelProvider)
+            .setCredentials(NoCredentials.getInstance());
+    builder
+        .getInstanceAdminStubSettingsBuilder()
+        .createInstanceOperationSettings()
+        .setPollingAlgorithm(
+            OperationTimedPollAlgorithm.create(
+                RetrySettings.newBuilder()
+                    .setInitialRetryDelay(Duration.ofSeconds(1L))
+                    .setMaxRetryDelay(Duration.ofSeconds(45L))
+                    .setRetryDelayMultiplier(2)
+                    .setTotalTimeout(Duration.ofHours(24L))
+                    .build()));
+
+    try (Spanner spanner = builder.build().getService()) {
+      com.google.cloud.spanner.InstanceAdminClient client = spanner.getInstanceAdminClient();
+      OperationFuture<Instance, CreateInstanceMetadata> op =
+          client.createInstance(
+              InstanceInfo.newBuilder(InstanceId.of("[PROJECT]", "[INSTANCE]")).build());
+      Instance instance = op.get();
+      assertThat(instance).isNotNull();
+      assertThat(instance.getDisplayName()).isEqualTo(displayName);
+    }
   }
 
   @Test
